@@ -10,13 +10,13 @@ import java.util.concurrent.CountDownLatch;
 
 public final class GradleLoginGUI implements ActionListener, KeyListener {
     private static final CountDownLatch latch = new CountDownLatch(1);
-    private static String password;
-
     private static final JFrame frame = new JFrame("Minecraft Login");
     private static final JPanel panel = new JPanel(new GridLayout(2, 1));
+    private static String password;
     private static JPasswordField field = new JPasswordField();
+    private static String username;
 
-    public static CountDownLatch create() {
+    public static CountDownLatch create(String[] rawData) {
         frame.setContentPane(panel);
         GradleLoginGUI loginGUI = new GradleLoginGUI();
         field.addKeyListener(loginGUI);
@@ -33,7 +33,7 @@ public final class GradleLoginGUI implements ActionListener, KeyListener {
 
     private static void centerComponent(Window comp) {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        comp.setLocation((screenSize.width - comp.getWidth())/ 2 , (screenSize.height - comp.getHeight())/2);
+        comp.setLocation((screenSize.width - comp.getWidth()) / 2, (screenSize.height - comp.getHeight()) / 2);
     }
 
     public static String getPasswordAndDiscard() {
@@ -45,18 +45,18 @@ public final class GradleLoginGUI implements ActionListener, KeyListener {
         return s;
     }
 
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        checkPW();
-    }
-
     private static void checkPW() {
         password = new String(field.getPassword());
         if (!password.equals(""))
             latch.countDown();
         else
-            JOptionPane.showMessageDialog(frame, "No password specified!");
+            if (JOptionPane.showConfirmDialog(frame, "No password specified, do you want to start offline?", "Question", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION)
+                latch.countDown();
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        checkPW();
     }
 
     @Override

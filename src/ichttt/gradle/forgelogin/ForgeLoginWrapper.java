@@ -1,23 +1,77 @@
 package ichttt.gradle.forgelogin;
 
+import com.google.common.base.Strings;
+import com.google.gson.GsonBuilder;
+import com.mojang.authlib.Agent;
+import com.mojang.authlib.exceptions.AuthenticationException;
+import com.mojang.authlib.properties.PropertyMap;
+import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.swing.*;
 import java.lang.reflect.InvocationTargetException;
+import java.net.Proxy;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 public class ForgeLoginWrapper {
+    public static final Logger LOGGER = LogManager.getLogger("ForgeGradleLoginWrapper");
 
-    public static void main(String[] args) throws NoSuchMethodException, IllegalAccessException, InterruptedException {
-        if (Arrays.stream(args).anyMatch(s -> s.equals("--username")) && Arrays.stream(args).noneMatch(s -> s.equals("--password"))) {
-            String[] newArgs = new String[args.length + 2];
-            System.arraycopy(args, 0, newArgs, 0, args.length);
-            CountDownLatch latch = GradleLoginGUI.create();
-            latch.await();
-            newArgs[newArgs.length - 2] = "--password";
-            newArgs[newArgs.length - 1] = Objects.requireNonNull(GradleLoginGUI.getPasswordAndDiscard());
-            args = newArgs;
+    public static void main(String[] args) throws InterruptedException, ReflectiveOperationException {
+        String username = getUsername(args);
+        boolean hadUsername = username != null;
+        if (!hadUsername) {
+            username = JOptionPane.showInputDialog("Please enter you email address");
+            if (Strings.isNullOrEmpty(username))
+                throw new RuntimeException("User does not want to give us his username :/");
         }
+
+        Map<String, Object> credentials = new HashMap<>();
+        credentials.put("username", username);
+        List<String> token = TokenHandler.readToken();
+        boolean loggedIn = false;
+        YggdrasilUserAuthentication auth;
+        if (token != null) {
+            auth = (YggdrasilUserAuthentication) new YggdrasilAuthenticationService(Proxy.NO_PROXY, "1").createUserAuthentication(Agent.MINECRAFT);
+            credentials.put("accessToken", token.get(1));
+
+            auth.loadFromStorage(credentials);
+            try {
+                auth.logIn();
+                args = getArgs(args, auth, hadUsername, token);
+                loggedIn = true;
+            } catch (AuthenticationException e) {
+                LOGGER.info("Login with token failed!", e);
+            }
+        } else {
+            LOGGER.info("Skipping token login attempt as no token could be found");
+        }
+        auth = (YggdrasilUserAuthentication) new YggdrasilAuthenticationService(Proxy.NO_PROXY, "1").createUserAuthentication(Agent.MINECRAFT);
+        auth.setUsername(username);
+
+        if (!loggedIn) {
+            CountDownLatch latch = GradleLoginGUI.create(args);
+            latch.await();
+            String password = GradleLoginGUI.getPasswordAndDiscard();
+            auth.setPassword(password);
+            if (!Strings.isNullOrEmpty(password)) {
+                try {
+                    List<String> newArgs = attemptLogin(auth);
+                    TokenHandler.saveArgs(newArgs);
+                    args = getArgs(args, auth, hadUsername, newArgs);
+                } catch (AuthenticationException e) {
+                    //TODO handle
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
         Class<?> clazz;
         try {
             clazz = Class.forName("GradleStart");
@@ -28,13 +82,66 @@ public class ForgeLoginWrapper {
         try {
             clazz.getDeclaredMethod("main", String[].class).invoke(null, (Object) args);
         } catch (InvocationTargetException e) {
-            e.printStackTrace();
-            Throwable cause = e.getCause();
-            if (cause != null && cause instanceof RuntimeException) {
-                Throwable cause2 = cause.getCause();
-                if (cause2 != null && cause2.getClass().getName().equals("com.mojang.authlib.exceptions.InvalidCredentialsException"))
-                    JOptionPane.showMessageDialog(null, cause2.getMessage());
-            }
+            throw new RuntimeException("----Minecraft crashed----", e.getCause());
         }
+    }
+
+    private static String[] getArgs(String[] args, YggdrasilUserAuthentication auth, boolean hadUsername, List<String> newArgs) throws AuthenticationException {
+
+        if (hadUsername) {
+            String[] oldArgs = new String[args.length - 2];
+            boolean skip = false;
+            int i = 0;
+            for (String s : args) {
+                if (skip)
+                    skip = false;
+                else if (s.equals("--username"))
+                    skip = true;
+                else {
+                    oldArgs[i] = s;
+                    i++;
+                }
+            }
+            args = oldArgs;
+        }
+
+        newArgs.addAll(Arrays.asList(args));
+        args = newArgs.toArray(new String[newArgs.size()]);
+        return args;
+    }
+
+    private static String getUsername(String[] rawData) {
+        String username = null;
+        boolean nextIsUsername = false;
+        for (String s : rawData) {
+            if (nextIsUsername) {
+                username = s;
+                break;
+            }
+            if (s.equals("--username"))
+                nextIsUsername = true;
+        }
+        return username;
+    }
+
+    //Stolen and modified from FG
+    private static List<String> attemptLogin(YggdrasilUserAuthentication auth) throws AuthenticationException {
+        auth.logIn();
+
+        LOGGER.info("Login Succesful!");
+        List<String> data = new ArrayList<>(10);
+        put(data, "accessToken", auth.getAuthenticatedToken());
+        put(data, "uuid", auth.getSelectedProfile().getId().toString().replace("-", ""));
+        put(data, "username", auth.getSelectedProfile().getName());
+        put(data, "userType", auth.getUserType().getName());
+
+        // 1.8 only apperantly.. -_-
+        put(data, "userProperties", new GsonBuilder().registerTypeAdapter(PropertyMap.class, new PropertyMap.Serializer()).create().toJson(auth.getUserProperties()));
+        return data;
+    }
+
+    private static void put(List<String> where, String key, String value) {
+        where.add("--" + key);
+        where.add(value);
     }
 }
