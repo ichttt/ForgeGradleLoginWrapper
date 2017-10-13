@@ -39,10 +39,12 @@ public class TokenHandler {
             Files.createFile(LOGIN_TOKEN);
             writer = Files.newBufferedWriter(LOGIN_TOKEN);
             boolean setNow = false;
+            boolean hasSet = false;
             for (String s : data) {
-                if (setNow)
+                if (setNow && !hasSet) {
                     writer.write(EncryptionService.encryptString(key, s));
-                else
+                    hasSet = true;
+                } else
                     writer.write(s);
                 writer.newLine();
                 setNow = true;
