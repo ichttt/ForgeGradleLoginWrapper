@@ -8,26 +8,27 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.concurrent.CountDownLatch;
 
-public final class GradleLoginGUI implements ActionListener, KeyListener {
-    private static final CountDownLatch latch = new CountDownLatch(1);
-    private static final JFrame frame = new JFrame("Minecraft Login");
-    private static final JPanel panel = new JPanel(new GridLayout(2, 1));
-    private static String password;
-    private static JPasswordField field = new JPasswordField();
-    private static String username;
+public final class LoginGUI implements ActionListener, KeyListener {
+    private final CountDownLatch latch = new CountDownLatch(1);
+    private final JFrame frame = new JFrame("Minecraft Login");
+    private final JPanel login = new JPanel(new GridLayout(2, 1));
+    private String password;
+    private JPasswordField field = new JPasswordField();
 
-    public static CountDownLatch create(String[] rawData) {
-        frame.setContentPane(panel);
-        GradleLoginGUI loginGUI = new GradleLoginGUI();
-        field.addKeyListener(loginGUI);
-        panel.add(field);
+    public LoginGUI() {
+        frame.setContentPane(login);
+        field.addKeyListener(this);
+        login.add(field);
         JButton okBtn = new JButton("OK");
-        okBtn.addActionListener(loginGUI);
-        panel.add(okBtn);
+        okBtn.addActionListener(this);
+        login.add(okBtn);
         frame.setMinimumSize(new Dimension(320, 200));
         centerComponent(frame);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+    }
+
+    public CountDownLatch getLatch() {
         return latch;
     }
 
@@ -36,16 +37,14 @@ public final class GradleLoginGUI implements ActionListener, KeyListener {
         comp.setLocation((screenSize.width - comp.getWidth()) / 2, (screenSize.height - comp.getHeight()) / 2);
     }
 
-    public static String getPasswordAndDiscard() {
+    public String getPasswordAndDiscard() {
         String s = password;
-        password = null;
         frame.dispose();
-        panel.removeAll();
-        field = null;
+        login.removeAll();
         return s;
     }
 
-    private static void checkPW() {
+    private void checkPW() {
         password = new String(field.getPassword());
         if (!password.equals(""))
             latch.countDown();

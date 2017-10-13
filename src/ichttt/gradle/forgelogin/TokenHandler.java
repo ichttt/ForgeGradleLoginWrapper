@@ -1,8 +1,8 @@
 package ichttt.gradle.forgelogin;
 
+import javax.crypto.SecretKey;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -12,7 +12,7 @@ import java.util.List;
 public class TokenHandler {
     private static final Path LOGIN_TOKEN = Paths.get(System.getProperty("user.dir") + "\\authtoken.dat");
 
-    public static List<String> readToken() {
+    public static List<String> readToken(SecretKey key) {
         if (!Files.exists(LOGIN_TOKEN))
             return null;
         BufferedReader reader = null;
@@ -22,42 +22,36 @@ public class TokenHandler {
             String read;
             while ((read = reader.readLine()) != null)
                 args.add(read);
+            args.set(1, EncryptionService.decryptString(key, args.get(1)));
             return args;
-        } catch (IOException e) {
+        } catch (Exception e) {
             ForgeLoginWrapper.LOGGER.error("Could not read token!", e);
         } finally {
-            if (reader != null) {
-                try {
-                    reader.close();
-                } catch (IOException e) {
-                    ForgeLoginWrapper.LOGGER.catching(e);
-                }
-            }
+            Utils.closeSilent(reader);
         }
         return null;
     }
 
-    public static void saveArgs(List<String> data) {
+    public static void saveArgs(SecretKey key, List<String> data) {
         BufferedWriter writer = null;
         try {
             Files.deleteIfExists(LOGIN_TOKEN);
             Files.createFile(LOGIN_TOKEN);
             writer = Files.newBufferedWriter(LOGIN_TOKEN);
+            boolean setNow = false;
             for (String s : data) {
-                writer.write(s);
+                if (setNow)
+                    writer.write(EncryptionService.encryptString(key, s));
+                else
+                    writer.write(s);
                 writer.newLine();
+                setNow = true;
             }
             writer.flush();
-        } catch (IOException e) {
+        } catch (Exception e) {
             ForgeLoginWrapper.LOGGER.error("Could not save token!", e);
         } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    ForgeLoginWrapper.LOGGER.catching(e);
-                }
-            }
+            Utils.closeSilent(writer);
         }
     }
 }

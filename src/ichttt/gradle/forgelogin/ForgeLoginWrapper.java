@@ -10,9 +10,12 @@ import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.crypto.SecretKey;
 import javax.swing.*;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.Proxy;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,7 +37,16 @@ public class ForgeLoginWrapper {
 
         Map<String, Object> credentials = new HashMap<>();
         credentials.put("username", username);
-        List<String> token = TokenHandler.readToken();
+        SecretKey key = EncryptionService.loadKey();
+        if (key == null) {
+            try {
+                key = EncryptionService.generateKey();
+                EncryptionService.saveKey(key);
+            } catch (NoSuchAlgorithmException | IOException e) {
+                throw new RuntimeException("Could not generate encryption key!");
+            }
+        }
+        List<String> token = TokenHandler.readToken(key);
         boolean loggedIn = false;
         YggdrasilUserAuthentication auth;
         if (token != null) {
@@ -56,17 +68,18 @@ public class ForgeLoginWrapper {
         auth.setUsername(username);
 
         if (!loggedIn) {
-            CountDownLatch latch = GradleLoginGUI.create(args);
+            LoginGUI gui = new LoginGUI();
+            CountDownLatch latch = gui.getLatch();
             latch.await();
-            String password = GradleLoginGUI.getPasswordAndDiscard();
+            String password = gui.getPasswordAndDiscard();
             auth.setPassword(password);
             if (!Strings.isNullOrEmpty(password)) {
                 try {
                     List<String> newArgs = attemptLogin(auth);
-                    TokenHandler.saveArgs(newArgs);
+                    TokenHandler.saveArgs(key, newArgs);
                     args = getArgs(args, auth, hadUsername, newArgs);
                 } catch (AuthenticationException e) {
-                    //TODO handle
+                    JOptionPane.showMessageDialog(null, "Failed to log in!\n" + e.toString(), "Login Failed", JOptionPane.ERROR_MESSAGE);
                     throw new RuntimeException(e);
                 }
             }
