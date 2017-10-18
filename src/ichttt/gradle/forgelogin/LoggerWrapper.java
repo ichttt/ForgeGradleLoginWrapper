@@ -10,7 +10,7 @@ public class LoggerWrapper extends Logger {
 
     @Override
     public void info(String message) { //Don't print that...
-        if (!message.startsWith("accessToken"))
+        if (message == null || !message.startsWith("accessToken") && !message.startsWith("password") && !message.startsWith("username"))
             super.info(message);
     }
 }

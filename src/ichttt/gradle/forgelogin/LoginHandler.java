@@ -25,7 +25,7 @@ public class LoginHandler {
     public static String[] loginPlayer(String username, String[] args) throws InterruptedException {
         boolean hadUsername = username != null;
         if (!hadUsername) {
-            username = JOptionPane.showInputDialog("Please enter you email address");
+            username = JOptionPane.showInputDialog("Please enter you email address or (if legacy) your MC user name.\nIt is recommended to set the command arg --username [YOUR EMAIL OR USERNAME] instead of this.");
             if (Strings.isNullOrEmpty(username))
                 throw new RuntimeException("User does not want to give us his username :/");
         }
