@@ -1,9 +1,16 @@
 # ForgeGradleLoginWrapper
-<h3>A dev enviroment basic login manager</h3>
+<h2>A dev enviroment basic login manager</h2>
 
 This Application is intended as a launcher for ForgeGradle.
 
-<h4>ForgeGradle isn't handling login the proper way</h4>
+<h3><a href=https://github.com/ichttt/ForgeGradleLoginWrapper/releases>Download</a></h3>
+
+<h3>Setup</h3>
+To use this in you own project, grab the latest version from github and place it in a folder in your workspace. Now just add <b>runtime ('RELATIVE PATH TO FILE/FGLW.jar')</b> to your dependencies in the build.gradle of the project and you are done.
+
+<h3>Why does this project exist</h3>
+
+<h4>IMO, ForgeGradle isn't handling login the proper way</h4>
 
 While ForgeGradle supports login, it is very basic and requires you to type your
 username and password into the command line options.
